@@ -9,7 +9,9 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 
 class IDs:
+    server = 1182668463496499240
     test_channel = 1198395844391604419
+    verify_channel = 1198749464068894771
     param = 531398388516651029
     arnold = 762015770728202243
     rupkatha = 1187052225441316916
@@ -24,9 +26,9 @@ class EmailParser:
 
 class CheckPresence:
     def __init__(self, data: str):
-        self.data = self.read_data(data)
+        self.data = self._read_data(data)
     
-    def read_data(self, data: str):
+    def _read_data(self, data: str):
         with open(data, 'r') as f:
             return tuple(csv.DictReader(f))
 

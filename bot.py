@@ -1,6 +1,13 @@
 from utils import TOKEN, IDs, EmailParser, CheckPresence
 from discord import Intents, Client, Message, app_commands, Interaction, Object
 
+__all__ = ["mybot"]
+
+command_tree = None
+server = None
+mybot = None
+parse_email = EmailParser()
+check_presence = CheckPresence("./sep-23.csv")
 
 class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
@@ -8,7 +15,7 @@ class Bot(Client, IDs):
 
     async def on_ready(self):
         await self.wait_until_ready()
-        await tree.sync(guild=server)
+        await command_tree.sync(guild=server)
 
         print(f"{self.user} has connected to Discord!")
 
@@ -28,27 +35,33 @@ class Bot(Client, IDs):
     async def on_message(self, message: Message):
         if (message.reference is not None 
             and message.reference.message_id == self.first_msg_id
-            and message.author.id in (self.param, self.arnold, self.rupkatha)
             ):
             await message.reply("Thanks for replying. 🙂")
-    
 
 
-# Bot Setup
-intents = Intents.default()
-intents.message_content = True
-intents.members = True
-server = Object(id=1182668463496499240)
+# ================ Bot Setup ====================
+def bot_setup():
+    global command_tree, server, mybot
+    intents = Intents.default()
+    intents.message_content = True
+    intents.members = True
 
-mybot = Bot(intents=intents)
-tree = app_commands.CommandTree(mybot)
+    mybot = Bot(intents=intents)
+    server = Object(id=IDs.server)
 
+bot_setup()
 
-@tree.command(name="ping", description="Ping the bot", guild=server)
+command_tree = app_commands.CommandTree(mybot)
+# ================ Slash Commands ====================
+@command_tree.command(
+        name="ping", 
+        description="Ping the bot", 
+        guild=server,
+    )
 async def ping_slash_cmd(interaction: Interaction):
     await interaction.response.send_message("Pong!")
 
-@tree.command(
+@command_tree.command(
         name="verify", 
         description="Verify yourself",
         guild=server,
@@ -56,9 +69,38 @@ async def ping_slash_cmd(interaction: Interaction):
 @app_commands.describe(email="Please enter your IITM Student mail id")
 async def verify_slash_cmd(interaction: Interaction, email: str):
     await interaction.response.send_message("Verifying your email!", ephemeral=True)
-    print(email)
 
+    user = interaction.user
+    print(f"Email provided: {email}")
+    print(f"User id: {user.id}")
+    print(f"Username: {user}")
+    print(f"User's name: {user.display_name}")
+    print(f"User's roles: {user.roles}")
+
+    if not parse_email(email):
+        await interaction.edit_original_response(content=
+                f"""## 👎 Invalid email!
+                You entered: `{email}`
+                Please enter a valid **IITM Student Mail Id** ending with `study.iitm.ac.in`"""
+                )
+        return
+    
     await interaction.edit_original_response(content="Email verified!")
+
+    if not (details:=check_presence(email)):
+        await interaction.followup.send(
+            content="""# Welcome _{user.display_name}_ to our server. 
+            Hope you will enjoye here. 😊""",
+            ephemeral=True
+            )
+        return
+    
+    await interaction.followup.send(
+        content=f"""# Welcome _{user.display_name}_ to our server. 😀
+        You are **{details["dept"].upper()}** student of **`20{email[:2]}`** year.
+        You belongs to Group **`{details["grp_no"]}`**.\n### _You will get access to exclusive channels_ :wink: :handshake:\n## As you are one of the Pichavities 🌟""",
+        ephemeral=True
+        )
 
 
 if __name__ == "__main__":

@@ -1,8 +1,5 @@
-import os
-import re
+from bot import mybot
+from utils import TOKEN
 
-# from responses import get_response
-
-
-print(TOKEN)
-
+if __name__ == "__main__":
+    mybot.run(token=TOKEN)
