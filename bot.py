@@ -1,6 +1,6 @@
-import code
-from math import e
-from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier, TrackEmail
+import asyncio
+import logging
+from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
 from discord import Intents, Client, Message, app_commands, Interaction, Object
 
 __all__ = ["mybot"]
@@ -11,8 +11,8 @@ mybot = None
 parse_email = EmailParser()
 check_presence = CheckPresence("./sep-23.csv")
 verify_email = EmailVerifier()
-email_tracker = None
-gen_code = None
+email_tracker = {} # user_id : [email_id, gen_code]   -- deleted after verified
+logger = logging.Logger("verified_emails")
 
 class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
@@ -38,12 +38,17 @@ class Bot(Client, IDs):
         await self.get_channel(channel).send(message)
 
     async def on_message(self, message: Message):
-        print("Message:", message)
         if message.author == self.user:
             return
 
-        if message.channel.id == self.verify_channel:
-            await self.send_message(self.verify_channel, f"Please verify your email id by using `/verify` command")
+        if message.channel.id == self.test_channel:
+            await self.send_message(self.test_channel, f"Hello {message.author.mention}")
+            return
+
+        elif message.channel.id == self.verify_channel:
+            await message.reply(f"Please verify your email id by using `/verify` command", delete_after=3)
+            await message.delete(delay=1)
+            return
 
 
 # ================ Bot Setup ====================
@@ -57,8 +62,8 @@ def bot_setup():
     server = Object(id=IDs.server)
 
 bot_setup()
-
 command_tree = app_commands.CommandTree(mybot)
+
 # ================ Slash Commands ====================
 @command_tree.command(
         name="ping", 
@@ -67,6 +72,7 @@ command_tree = app_commands.CommandTree(mybot)
     )
 async def ping_slash_cmd(interaction: Interaction):
     await interaction.response.send_message("Pong!")
+
 
 @command_tree.command(
         name="verify", 
@@ -87,11 +93,16 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
                 Please enter a valid **IITM Student Mail Id** in this format:\n`<roll_no>@*study.iitm.ac.in`"""
                 )
         return
-    email_tracker = TrackEmail(email)
-    email_tracker.gen_code = verify_email(email)
-    print(f"Code: {email_tracker.gen_code}")
+    
+    gen_code = verify_email(email)
+    print(f"Code: {gen_code}")
+    email_tracker[interaction.user.id] = [email, gen_code]
+    print(email_tracker)
 
     await interaction.followup.send(content="We have sent you a verification code to your mail id.", ephemeral=True)
+    await asyncio.sleep(3)
+    await interaction.delete_original_response()
+
 
 
 @command_tree.command(
@@ -103,12 +114,6 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
 async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     global email_tracker
 
-    if email_tracker.gen_code is None:
-        await interaction.response.send_message("Please use `/verify` command first to get the code", ephemeral=True)
-        return
-    email_tracker.user_code = code
-    await interaction.response.send_message("Verifying the code!", ephemeral=True)
-
     user = interaction.user
     print(f"Code provided: {code}")
     print(f"User id: {user.id}")
@@ -116,16 +121,21 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     print(f"User's name: {user.display_name}")
     print(f"User's roles: {user.roles}")
 
-    if email_tracker.gen_code != email_tracker.user_code:
+
+    if email_tracker.get(user.id) is None:
+        await interaction.response.send_message("Please use `/verify` command first to get the code", ephemeral=True)
+        return
+    await interaction.response.send_message("Verifying the code!", ephemeral=True)
+
+    if email_tracker[user.id][1] != code:
         await interaction.edit_original_response(content=
-                f"""### 👎 Invalid code!
-                Please enter the correct code"""
+                f"""### Invalid code!
+                Please enter the correct 6-digit code."""
                 )
         return
-
     await interaction.edit_original_response(content="### Code is Valid!")
     
-    if not (details:=check_presence(email_tracker.email)):
+    if not (details:=check_presence(email_tracker[user.id][0])):
         await interaction.followup.send(
             content=f"""# Welcome _{user.display_name}_ to our server. 
             Hope you will enjoy here. 😊""",
@@ -135,12 +145,17 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     
     await interaction.followup.send(
         content=f"""# Welcome _{user.display_name}_ to our server. 😀
-        You are **{details["dept"].upper()}** student of **`20{email_tracker.email[:2]}`** year.
-        You belongs to Group **`{details["grp_no"]}`**.\n### _You will get access to exclusive channels_ :wink: :handshake:\n## As you are one of the Pichavities 🌟""",
+        You are **{details["dept"].upper()}** student of **`20{email_tracker[user.id][0][:2]}`** year.
+        You belongs to Group **`{details["grp_no"]}`**.\n### _You will get access to exclusive channels_ :wink: :handshake:\n## As you are one of the Pichavites. 🌟""",
         ephemeral=True
         )
     
-    del email_tracker
+    await asyncio.sleep(3)
+    await interaction.delete_original_response()
+
+    del email_tracker[interaction.user.id]
+    print(email_tracker)
+
 
 
 if __name__ == "__main__":
