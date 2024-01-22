@@ -17,10 +17,14 @@ PSWD = os.getenv("ACC_PSWD")
 class IDs:
     server = 1182668463496499240
     test_channel = 1198395844391604419
-    verify_channel = 1198749464068894771
+    verify_channel = 1198756336977068112
     param = 531398388516651029
     arnold = 762015770728202243
     rupkatha = 1187052225441316916
+    verified_iitm_role = ...
+    group_no_role = ...
+    group_leader_role = ...
+    pichavaram_role = ...
 
 
 class EmailParser:
@@ -75,6 +79,13 @@ class EmailVerifier:
         self._send_email(template, to_email)
         return code
 
+class TrackEmail:
+    def __init__(self, email:str):
+        self.email = email
+        self.gen_code = None
+        self.user_code = None
+    
+
 
 if __name__ == "__main__":
     # parse_email = EmailParser()
@@ -106,6 +117,20 @@ if __name__ == "__main__":
     # print(verifyemail._create_template(123456))
     # print("Arnold", verifyemail("pichavaram-sec@ds.study.iitm.ac.in"))
     # print("Rupkatha", verifyemail("pichavaram-ds@ds.study.iitm.ac.in"))
+
+    tracker = TrackEmail("Hello@gmail.com")
+    print(tracker.email)
+    print(tracker.verified)
+    tracker.gen_code = 12345
+    tracker.user_code = 12345
+    print(tracker)
+    tracker.email_verified()
+    if tracker.code_gen == tracker.user_code:
+        print("Verified")
+        del tracker
+
+    print("After verifying", tracker)
+
 
 
 

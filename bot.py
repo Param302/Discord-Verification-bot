@@ -1,4 +1,6 @@
-from utils import TOKEN, IDs, EmailParser, CheckPresence
+import code
+from math import e
+from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier, TrackEmail
 from discord import Intents, Client, Message, app_commands, Interaction, Object
 
 __all__ = ["mybot"]
@@ -8,6 +10,9 @@ server = None
 mybot = None
 parse_email = EmailParser()
 check_presence = CheckPresence("./sep-23.csv")
+verify_email = EmailVerifier()
+email_tracker = None
+gen_code = None
 
 class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
@@ -33,10 +38,12 @@ class Bot(Client, IDs):
         await self.get_channel(channel).send(message)
 
     async def on_message(self, message: Message):
-        if (message.reference is not None 
-            and message.reference.message_id == self.first_msg_id
-            ):
-            await message.reply("Thanks for replying. 🙂")
+        print("Message:", message)
+        if message.author == self.user:
+            return
+
+        if message.channel.id == self.verify_channel:
+            await self.send_message(self.verify_channel, f"Please verify your email id by using `/verify` command")
 
 
 # ================ Bot Setup ====================
@@ -68,39 +75,72 @@ async def ping_slash_cmd(interaction: Interaction):
     )
 @app_commands.describe(email="Please enter your IITM Student mail id")
 async def verify_slash_cmd(interaction: Interaction, email: str):
-    await interaction.response.send_message("Verifying your email!", ephemeral=True)
+    global email_tracker
 
-    user = interaction.user
+    await interaction.response.send_message("Verifying your email!", ephemeral=True)
     print(f"Email provided: {email}")
-    print(f"User id: {user.id}")
-    print(f"Username: {user}")
-    print(f"User's name: {user.display_name}")
-    print(f"User's roles: {user.roles}")
 
     if not parse_email(email):
         await interaction.edit_original_response(content=
                 f"""## 👎 Invalid email!
                 You entered: `{email}`
-                Please enter a valid **IITM Student Mail Id** ending with `study.iitm.ac.in`"""
+                Please enter a valid **IITM Student Mail Id** in this format:\n`<roll_no>@*study.iitm.ac.in`"""
                 )
         return
-    
-    await interaction.edit_original_response(content="Email verified!")
+    email_tracker = TrackEmail(email)
+    email_tracker.gen_code = verify_email(email)
+    print(f"Code: {email_tracker.gen_code}")
 
-    if not (details:=check_presence(email)):
+    await interaction.followup.send(content="We have sent you a verification code to your mail id.", ephemeral=True)
+
+
+@command_tree.command(
+        name="code", 
+        description="Enter the code received in your mail",
+        guild=server,
+    )
+@app_commands.describe(code="Please enter the verification code you received in your mail")
+async def verify_code_slsh_cmd(interaction: Interaction, code: int):
+    global email_tracker
+
+    if email_tracker.gen_code is None:
+        await interaction.response.send_message("Please use `/verify` command first to get the code", ephemeral=True)
+        return
+    email_tracker.user_code = code
+    await interaction.response.send_message("Verifying the code!", ephemeral=True)
+
+    user = interaction.user
+    print(f"Code provided: {code}")
+    print(f"User id: {user.id}")
+    print(f"Username: {user}")
+    print(f"User's name: {user.display_name}")
+    print(f"User's roles: {user.roles}")
+
+    if email_tracker.gen_code != email_tracker.user_code:
+        await interaction.edit_original_response(content=
+                f"""### 👎 Invalid code!
+                Please enter the correct code"""
+                )
+        return
+
+    await interaction.edit_original_response(content="### Code is Valid!")
+    
+    if not (details:=check_presence(email_tracker.email)):
         await interaction.followup.send(
             content=f"""# Welcome _{user.display_name}_ to our server. 
-            Hope you will enjoye here. 😊""",
+            Hope you will enjoy here. 😊""",
             ephemeral=True
             )
         return
     
     await interaction.followup.send(
         content=f"""# Welcome _{user.display_name}_ to our server. 😀
-        You are **{details["dept"].upper()}** student of **`20{email[:2]}`** year.
+        You are **{details["dept"].upper()}** student of **`20{email_tracker.email[:2]}`** year.
         You belongs to Group **`{details["grp_no"]}`**.\n### _You will get access to exclusive channels_ :wink: :handshake:\n## As you are one of the Pichavities 🌟""",
         ephemeral=True
         )
+    
+    del email_tracker
 
 
 if __name__ == "__main__":
