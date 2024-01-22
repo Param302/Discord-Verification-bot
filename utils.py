@@ -1,11 +1,17 @@
 import os
 import re
 import csv
+import ssl
+import smtplib
+from random import randint
 from dotenv import load_dotenv
+from email.message import EmailMessage
+
 
 # Loading Token
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+PSWD = os.getenv("ACC_PSWD")
 
 
 class IDs:
@@ -39,6 +45,36 @@ class CheckPresence:
         return None
     
 
+class EmailVerifier:
+    from_email = "pichavaram-webad@ds.study.iitm.ac.in"
+    subject = "Verification Code for Pichavaram House Discord Server"
+
+    def __init__(self):
+        ...
+    
+    def _generate_code(self) -> str:
+        return randint(100000, 999999)
+    
+    def _create_template(self, code:int) -> str:
+        em = EmailMessage()
+        em["Subject"] = self.subject
+        em["From"] = self.from_email
+        em.set_content(f"Your verification code is {code}")
+        return em
+    
+    def _send_email(self, template: EmailMessage, to_email: str):
+        template["To"] = to_email
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(self.from_email, PSWD)
+            server.sendmail(self.from_email, to_email, template.as_string())
+
+    def __call__(self, to_email: str) -> int:
+        code = self._generate_code()
+        template = self._create_template(code)
+        self._send_email(template, to_email)
+        return code
+
 
 if __name__ == "__main__":
     # parse_email = EmailParser()
@@ -60,11 +96,16 @@ if __name__ == "__main__":
     # print(parse_email("25f4000004@ds.study.iitm.ac.in"))
     # print(parse_email("25f0000004@ds.study.iitm.ac.in"))
 
-    check_presence = CheckPresence("./sep-23.csv")
-    print(check_presence("21f1000019@ds.study.iitm.ac.in"))
-    print(check_presence("22f3000797@ds.study.iitm.ac.in"))
-    print(check_presence("Me"))
+    # check_presence = CheckPresence("./sep-23.csv")
+    # print(check_presence("21f1000019@ds.study.iitm.ac.in"))
+    # print(check_presence("22f3000797@ds.study.iitm.ac.in"))
+    # print(check_presence("Me"))
 
+    # verifyemail = EmailVerifier()
+    # print(verifyemail._generate_code())
+    # print(verifyemail._create_template(123456))
+    # print("Arnold", verifyemail("pichavaram-sec@ds.study.iitm.ac.in"))
+    # print("Rupkatha", verifyemail("pichavaram-ds@ds.study.iitm.ac.in"))
 
 
 

@@ -89,7 +89,7 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
 
     if not (details:=check_presence(email)):
         await interaction.followup.send(
-            content="""# Welcome _{user.display_name}_ to our server. 
+            content=f"""# Welcome _{user.display_name}_ to our server. 
             Hope you will enjoye here. 😊""",
             ephemeral=True
             )
