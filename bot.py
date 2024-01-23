@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from re import A
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
 from discord import Intents, Client, Message, app_commands, Interaction, Object, Activity, ActivityType
 
@@ -9,52 +8,64 @@ __all__ = ["mybot"]
 command_tree = None
 server = None
 mybot = None
+verification_msg = None
 parse_email = EmailParser()
 check_presence = CheckPresence("./sep-23.csv")
-verify_email = EmailVerifier()
+email_code_gen = EmailVerifier()
 email_tracker = {} # user_id : [email_id, gen_code]   -- deleted after verified
-logger = logging.Logger("verified_emails")
+
+
+# logging.basicConfig(datefmt="%Y-%d %H:%M:%S")
+logger = logging.getLogger("discord")
+logger.setLevel(logging.CRITICAL)
+log_handler = logging.FileHandler(filename="discord bot.log", encoding="utf-8", mode="w")
+log_handler.setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s: %(name)s - %(message)s", datefmt="%Y-%d %H:%M:%S"))
+logger.addHandler(log_handler)
 
 class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
         super().__init__(intents=intents)
+        logger.info("Bot initialized")
+        self.startup_msg = "## Hello, I am a . I am here to help you.\n### <@531398388516651029> created me."
 
     async def on_ready(self):
         await self.wait_until_ready()
         await command_tree.sync(guild=server)
-
-        print(f"{self.user} has connected to Discord!")
-
+        logger.info("Bot has connected to Discord!")
         await self.change_presence(activity=Activity(
             name="/verify",
             type=ActivityType.listening,
         ))
-
         await self.send_startup_message(self.test_channel)
-        print("Startup message sent")
+        logger.info(f"Startup message sent")
     
     async def send_startup_message(self, channel: int):
-        msg = await self.get_channel(channel).send(
-            """## Hello, I am a Pichu. I am here to help you.
-            ### <@531398388516651029> created me."""
-            )
+        msg = await self.get_channel(channel).send(self.startup_msg)
         self.first_msg_id = msg.id
     
     async def send_message(self, channel:int, message:str):
         await self.get_channel(channel).send(message)
+        logger.info(f"Message sent in channel: {self.get_channel(channel)}\tMessage: '{message}'")
 
     async def on_message(self, message: Message):
+        global email_tracker
         if message.author == self.user:
             return
 
+        logger.info(f"Message received - chnanel: {message.channel.name} by: {message.author}({message.author.id})\tMessage ({message.id}): '{message.content}'")
+
         if message.channel.id == self.test_channel:
             await self.send_message(self.test_channel, f"Hello {message.author.mention}")
-            return
 
         elif message.channel.id == self.verify_channel:
-            await message.reply(f"Please verify your email id by using `/verify` command", delete_after=3)
+            if email_tracker.get(message.author.id) is None:
+                await message.reply(f"Please verify your email id by using **`/verify`** command", delete_after=3)
+            elif email_tracker[message.author.id][0]:
+                await message.reply(f"Please enter the verification code by using **`/code`** command", delete_after=3)
+
             await message.delete(delay=1)
-            return
+            logger.info(f"Deleted message ({message.id})")
+
 
 
 # ================ Bot Setup ====================
@@ -72,43 +83,46 @@ command_tree = app_commands.CommandTree(mybot)
 
 # ================ Slash Commands ====================
 @command_tree.command(
-        name="ping", 
-        description="Ping the bot", 
-        guild=server,
-    )
-async def ping_slash_cmd(interaction: Interaction):
-    await interaction.response.send_message("Pong!")
-
-
-@command_tree.command(
         name="verify", 
         description="Verify yourself",
         guild=server,
     )
 @app_commands.describe(email="Please enter your IITM Student mail id")
 async def verify_slash_cmd(interaction: Interaction, email: str):
-    global email_tracker
+    global verification_msg, email_tracker
 
-    await interaction.response.send_message("Verifying your email!", ephemeral=True)
-    print(f"Email provided: {email}")
+    if email_tracker.get(interaction.user.id) is not None:
+        logger.warning(f"User ({interaction.user.id}) tried to use /verify command AGAIN with email: '{email}'")
+        await interaction.response.send_message("You have already used **`/verify`** command\nIf you think you've entered wrong mail, use **`/reset`** command.", ephemeral=True, delete_after=7)
+        return
+
+
+    logger.info(f"User ({interaction.user.id}) used /verify command with email: '{email}'")
+    await interaction.response.send_message("## Validating email id ⏳", ephemeral=True)
 
     if not parse_email(email):
+        logger.warning(f"User ({interaction.user.id}) entered invalid email.")
         await interaction.edit_original_response(content=
-                f"""## 👎 Invalid email!
-                You entered: `{email}`
-                Please enter a valid **IITM Student Mail Id** in this format:\n`<roll_no>@*study.iitm.ac.in`"""
+                f"""### Invalid email!\nYou entered: `{
+                    email if len(email) < 40 else f"{email[:40]}..."
+                }`\nPlease enter a valid **IITM Student Mail Id** in this format: `<roll_no>@*study.iitm.ac.in`"""
                 )
+        await asyncio.sleep(7)
+        await interaction.delete_original_response()
         return
     
-    gen_code = verify_email(email)
-    print(f"Code: {gen_code}")
+
+
+    gen_code = email_code_gen(email)
+    logger.info(f"Generated code - {gen_code} has been sent to '{email}'")
+
     email_tracker[interaction.user.id] = [email, gen_code]
-    print(email_tracker)
+    logger.info(f"Emails in queue: {len(email_tracker)}")
 
-    await interaction.followup.send(content="We have sent you a verification code to your mail id.", ephemeral=True)
-    await asyncio.sleep(3)
-    await interaction.delete_original_response()
-
+    verification_msg = await interaction.edit_original_response(content="## Verification\nWe have sent the verification code in your email.\nUse **`/code`** command to enter the latest code.\n\n**Note:** Check spam folder if not present in inbox.")
+    print(verification_msg)
+    
+    
 
 
 @command_tree.command(
@@ -116,32 +130,37 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
         description="Enter the code received in your mail",
         guild=server,
     )
-@app_commands.describe(code="Please enter the verification code you received in your mail")
+@app_commands.describe(code="Please enter the verification code received in your mail")
 async def verify_code_slsh_cmd(interaction: Interaction, code: int):
-    global email_tracker
+    global verification_msg, email_tracker
 
     user = interaction.user
-    print(f"Code provided: {code}")
-    print(f"User id: {user.id}")
-    print(f"Username: {user}")
-    print(f"User's name: {user.display_name}")
-    print(f"User's roles: {user.roles}")
-
+    logger.info(f"User ({user.id}) used /code command with code: {code}")
 
     if email_tracker.get(user.id) is None:
-        await interaction.response.send_message("Please use `/verify` command first to get the code", ephemeral=True)
+        logger.warning(f"User ({user.id}) tried to use /code command WITHOUT using /verify command first")
+        await interaction.response.send_message("Please use **`/verify`** command first to get the code", ephemeral=True, delete_after=5)
         return
-    await interaction.response.send_message("Verifying the code!", ephemeral=True)
+    
+    await verification_msg.delete(delay=3)
+
+    await interaction.response.send_message("## Verifying the code!", ephemeral=True)
 
     if email_tracker[user.id][1] != code:
+        logger.warning(f"User ({user.id}) entered invalid code: {code}\nCorrect code: {email_tracker[user.id][1]}")
+
         await interaction.edit_original_response(content=
-                f"""### Invalid code!
-                Please enter the correct 6-digit code."""
+                f"""### Invalid code!\nPlease enter the correct 6-digit code."""
                 )
+        await asyncio.sleep(5)
+        await interaction.delete_original_response()
         return
-    await interaction.edit_original_response(content="### Code is Valid!")
     
+    await interaction.edit_original_response(content="## Code is Valid!")
+
     if not (details:=check_presence(email_tracker[user.id][0])):
+
+        logger.warning(f"User ({user.id}) verified with email: '{email_tracker[user.id][0]}' but is not from Pichavaram House")
         await interaction.followup.send(
             content=f"""# Welcome _{user.display_name}_ to our server. 
             Hope you will enjoy here. 😊""",
@@ -149,20 +168,43 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
             )
         return
     
+    logger.info(f"User ({user.id}) verified with email: '{email_tracker[user.id][0]}' and is from Pichavaram House")
     await interaction.followup.send(
         content=f"""# Welcome _{user.display_name}_ to our server. 😀
         You are **{details["dept"].upper()}** student of **`20{email_tracker[user.id][0][:2]}`** year.
-        You belongs to Group **`{details["grp_no"]}`**.\n### _You will get access to exclusive channels_ :wink: :handshake:\n## As you are one of the Pichavites. 🌟""",
+        You belongs to Group **`{details["grp_no"]}`**.\n_You will get access to exclusive channels_ :wink: :handshake:\n### As you are one of the Pichavites. 🌟""",
         ephemeral=True
         )
     
     await asyncio.sleep(3)
     await interaction.delete_original_response()
+    del email_tracker[interaction.user.id]
+    logger.info(f"Emails in queue: {len(email_tracker)}")
+
+
+@command_tree.command(
+        name="reset", 
+        description="Reset Email Verification",
+        guild=server,
+    )
+async def reset_slash_cmd(interaction: Interaction):
+    global verification_msg, email_tracker
+
+    if None in (verification_msg, email_tracker.get(interaction.user.id)):
+        logger.warning(f"User ({interaction.user.id}) tried to use /reset command WITHOUT using /verify command first")
+        await interaction.response.send_message("You have not provided email yet.\nPlease use **`/verify`** command first.", ephemeral=True, delete_after=5)
+        return
+    
+    await verification_msg.delete(delay=3)
+    await interaction.response.send_message("## Resetting your verification!", ephemeral=True)
 
     del email_tracker[interaction.user.id]
-    print(email_tracker)
+    logger.info(f"User ({interaction.user.id}) reset the email verification")
+    logger.info(f"Emails in queue: {len(email_tracker)}")
+    await interaction.edit_original_response(content="## Verification Reset Successful!\nYou can use **`/verify`** command again.")
 
-
+    await asyncio.sleep(5)
+    await interaction.delete_original_response()
 
 if __name__ == "__main__":
     mybot.run(token=TOKEN)
