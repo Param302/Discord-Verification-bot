@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from re import A
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
-from discord import Intents, Client, Message, app_commands, Interaction, Object
+from discord import Intents, Client, Message, app_commands, Interaction, Object, Activity, ActivityType
 
 __all__ = ["mybot"]
 
@@ -23,6 +24,11 @@ class Bot(Client, IDs):
         await command_tree.sync(guild=server)
 
         print(f"{self.user} has connected to Discord!")
+
+        await self.change_presence(activity=Activity(
+            name="/verify",
+            type=ActivityType.listening,
+        ))
 
         await self.send_startup_message(self.test_channel)
         print("Startup message sent")

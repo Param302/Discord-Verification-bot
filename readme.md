@@ -10,6 +10,7 @@
 [x] Email OTP
 [x] Verify OTP
 [x] Synchronize multi-user at a time
+[x] Status added
 [ ] Log data in a channel and in a file
 - [ ] Details when joined with user id and email id in a file and channel
 - [ ] Above details with username, role assigned in channel
