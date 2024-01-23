@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
 from discord import Intents, Client, Message, app_commands, Interaction, Object, Activity, ActivityType
 
@@ -14,14 +15,15 @@ check_presence = CheckPresence("./sep-23.csv")
 email_code_gen = EmailVerifier()
 email_tracker = {} # user_id : [email_id, gen_code]   -- deleted after verified
 
-
-# logging.basicConfig(datefmt="%Y-%d %H:%M:%S")
+# ================ Logger Setup ====================
 logger = logging.getLogger("discord")
 logger.setLevel(logging.CRITICAL)
 log_handler = logging.FileHandler(filename="discord bot.log", encoding="utf-8", mode="w")
 log_handler.setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s: %(name)s - %(message)s", datefmt="%Y-%d %H:%M:%S"))
 logger.addHandler(log_handler)
 
+
+# ================ Bot ====================
 class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
         super().__init__(intents=intents)
@@ -67,7 +69,6 @@ class Bot(Client, IDs):
             logger.info(f"Deleted message ({message.id})")
 
 
-
 # ================ Bot Setup ====================
 def bot_setup():
     global command_tree, server, mybot
@@ -89,16 +90,25 @@ command_tree = app_commands.CommandTree(mybot)
     )
 @app_commands.describe(email="Please enter your IITM Student mail id")
 async def verify_slash_cmd(interaction: Interaction, email: str):
-    global verification_msg, email_tracker
+    global mybot, verification_msg, email_tracker
+
+    if interaction.user.get_role(IDs.not_verified_role) is None:
+        await interaction.response.send_message("### You are already verified.", ephemeral=True, delete_after=3)
+        return
+
+    if interaction.channel_id != IDs.verify_channel:
+        logger.warning(f"User ({interaction.user.id}) tried to use /verify command in wrong channel")
+        await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
+        return
 
     if email_tracker.get(interaction.user.id) is not None:
         logger.warning(f"User ({interaction.user.id}) tried to use /verify command AGAIN with email: '{email}'")
         await interaction.response.send_message("You have already used **`/verify`** command\nIf you think you've entered wrong mail, use **`/reset`** command.", ephemeral=True, delete_after=7)
         return
 
-
     logger.info(f"User ({interaction.user.id}) used /verify command with email: '{email}'")
     await interaction.response.send_message("## Validating email id ⏳", ephemeral=True)
+    await mybot.send_message(mybot.log_channel, f"**{interaction.user.name}** is verifying.")
 
     if not parse_email(email):
         logger.warning(f"User ({interaction.user.id}) entered invalid email.")
@@ -112,7 +122,6 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
         return
     
 
-
     gen_code = email_code_gen(email)
     logger.info(f"Generated code - {gen_code} has been sent to '{email}'")
 
@@ -121,8 +130,6 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
 
     verification_msg = await interaction.edit_original_response(content="## Verification\nWe have sent the verification code in your email.\nUse **`/code`** command to enter the latest code.\n\n**Note:** Check spam folder if not present in inbox.")
     print(verification_msg)
-    
-    
 
 
 @command_tree.command(
@@ -132,7 +139,17 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
     )
 @app_commands.describe(code="Please enter the verification code received in your mail")
 async def verify_code_slsh_cmd(interaction: Interaction, code: int):
-    global verification_msg, email_tracker
+    global mybot, verification_msg, email_tracker
+
+    if interaction.user.get_role(IDs.not_verified_role) is None:
+        await interaction.response.send_message("### You are already verified.", ephemeral=True, delete_after=3)
+        return
+
+    if interaction.channel_id != IDs.verify_channel:
+        logger.warning(f"User ({interaction.user.id}) tried to use /code command in wrong channel")
+        await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
+        return
+
 
     user = interaction.user
     logger.info(f"User ({user.id}) used /code command with code: {code}")
@@ -156,7 +173,7 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         await interaction.delete_original_response()
         return
     
-    await interaction.edit_original_response(content="## Code is Valid!")
+    await interaction.edit_original_response(content="### Code is Valid!\n## You are Verified!")
 
     if not (details:=check_presence(email_tracker[user.id][0])):
 
@@ -176,6 +193,7 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         ephemeral=True
         )
     
+    await mybot.send_message(mybot.log_channel, f"**{user.name}** is verified. ✅")
     await asyncio.sleep(3)
     await interaction.delete_original_response()
     del email_tracker[interaction.user.id]
@@ -190,6 +208,15 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
 async def reset_slash_cmd(interaction: Interaction):
     global verification_msg, email_tracker
 
+    if interaction.user.get_role(IDs.not_verified_role) is None:
+        await interaction.response.send_message("### You are already verified.", ephemeral=True, delete_after=3)
+        return
+
+    if interaction.channel_id != IDs.verify_channel:
+        logger.warning(f"User ({interaction.user.id}) tried to use /reset command in wrong channel")
+        await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
+        return
+
     if None in (verification_msg, email_tracker.get(interaction.user.id)):
         logger.warning(f"User ({interaction.user.id}) tried to use /reset command WITHOUT using /verify command first")
         await interaction.response.send_message("You have not provided email yet.\nPlease use **`/verify`** command first.", ephemeral=True, delete_after=5)
@@ -203,8 +230,10 @@ async def reset_slash_cmd(interaction: Interaction):
     logger.info(f"Emails in queue: {len(email_tracker)}")
     await interaction.edit_original_response(content="## Verification Reset Successful!\nYou can use **`/verify`** command again.")
 
+    await mybot.send_message(mybot.log_channel, f"{interaction.user.name} has reset their verification.")
     await asyncio.sleep(5)
     await interaction.delete_original_response()
+
 
 if __name__ == "__main__":
     mybot.run(token=TOKEN)
