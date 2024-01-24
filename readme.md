@@ -88,12 +88,12 @@ ACC_PSWD=<your google acc app password to send emails>
 ├── .gitignore
 ├── .env
 ├── ids.json
-|-- data.csv
+├── data.csv
 ├── README.md
 ├── main.py
 ├── bot.py
 ├── utils.py
-├── discord-bot.log // log file [created automatically]
+├── discord-bot.log     // created automatically
 └── requirements.txt
 ```
 
