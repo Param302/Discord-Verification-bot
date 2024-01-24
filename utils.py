@@ -12,6 +12,7 @@ from email.message import EmailMessage
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PSWD = os.getenv("ACC_PSWD")
+EMAIL_ID = os.getenv("ACC_EMAIL")
 
 def extract_ids(path):
     with open(path, "r") as f:
@@ -45,7 +46,7 @@ class CheckPresence:
     
 
 class EmailVerifier:
-    from_email = "pichavaram-webad@ds.study.iitm.ac.in"
+    from_email = EMAIL_ID
     subject = "Verification Code for Pichavaram House Discord Server"
 
     def __init__(self):
@@ -73,54 +74,3 @@ class EmailVerifier:
         template = self._create_template(code)
         self._send_email(template, to_email)
         return code
-
-
-
-# if __name__ == "__main__":
-    # parse_email = EmailParser()
-    # print("Valid cases")
-    # print(parse_email("23f3000042@es.study.iitm.ac.in"))
-    # print(parse_email("21f2000518@ds.study.iitm.ac.in"))
-    # print(parse_email("23dp2000028@ds.study.iitm.ac.in"))
-    # print(parse_email("23ds2000028@ds.study.iitm.ac.in"))
-    # print(parse_email("21f1000004@ds.study.iitm.ac.in"))
-    # print(parse_email("23f1234567@ds.study.iitm.ac.in"))
-    # print("Invalid cases")
-    # print(parse_email("Hello"))
-    # print(parse_email("26f1000004@ds.study.iitm.ac.in"))
-    # print(parse_email("23df1000004@ds.study.iitm.ac.in"))
-    # print(parse_email("22f12345678@ds.study.iitm.ac.in"))
-    # print(parse_email("22f1234567@ess.study.iitm.ac.in"))
-    # print(parse_email("22f1234567@ds.iitm.ac.in"))
-    # print(parse_email("22f123457@study.iitm.ac.in"))
-    # print(parse_email("25f4000004@ds.study.iitm.ac.in"))
-    # print(parse_email("25f0000004@ds.study.iitm.ac.in"))
-
-    # check_presence = CheckPresence("./sep-23.csv")
-    # print(check_presence("21f1000019@ds.study.iitm.ac.in"))
-    # print(check_presence("22f3000797@ds.study.iitm.ac.in"))
-    # print(check_presence("Me"))
-
-    # verifyemail = EmailVerifier()
-    # print(verifyemail._generate_code())
-    # print(verifyemail._create_template(123456))
-    # print("Arnold", verifyemail("pichavaram-sec@ds.study.iitm.ac.in"))
-    # print("Rupkatha", verifyemail("pichavaram-ds@ds.study.iitm.ac.in"))
-
-    # tracker = TrackEmail("Hello@gmail.com")
-    # print(tracker.email)
-    # print(tracker.verified)
-    # tracker.gen_code = 12345
-    # tracker.user_code = 12345
-    # print(tracker)
-    # tracker.email_verified()
-    # if tracker.code_gen == tracker.user_code:
-    #     print("Verified")
-    #     del tracker
-
-    # print("After verifying", tracker)
-
-
-
-
-

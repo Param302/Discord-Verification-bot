@@ -17,7 +17,7 @@ email_tracker = {} # user_id : [email_id, gen_code]   -- deleted after verified
 # ================ Logger Setup ====================
 logger = logging.getLogger("discord")
 logger.setLevel(logging.CRITICAL)
-log_handler = logging.FileHandler(filename="discord bot.log", encoding="utf-8", mode="w")
+log_handler = logging.FileHandler(filename="discord-bot.log", encoding="utf-8", mode="w")
 log_handler.setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s: %(name)s - %(message)s", datefmt="%Y-%d %H:%M:%S"))
 logger.addHandler(log_handler)
 
@@ -38,7 +38,7 @@ class Bot(Client, IDs):
             type=ActivityType.listening,
         ))
         await self.send_startup_message(self.test_channel)
-        logger.info(f"Startup message sent")
+        # logger.info(f"Startup message sent")
     
     async def send_startup_message(self, channel: int):
         msg = await self.get_channel(channel).send(self.startup_msg)
@@ -46,7 +46,6 @@ class Bot(Client, IDs):
     
     async def send_message(self, channel:int, message:str):
         await self.get_channel(channel).send(message)
-        logger.info(f"Message sent in channel: {self.get_channel(channel)}\tMessage: '{message}'")
 
     async def on_message(self, message: Message):
         global email_tracker
@@ -122,7 +121,7 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
     
 
     gen_code = email_code_gen(email)
-    logger.info(f"Generated code - {gen_code} has been sent to '{email}'")
+    logger.info(f"Generated code - {gen_code} sent to '{email}'")
 
     email_tracker[interaction.user.id] = [email, gen_code]
     logger.info(f"Emails in queue: {len(email_tracker)}")
@@ -145,7 +144,6 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         return
 
     if interaction.channel_id != IDs.verify_channel:
-        logger.warning(f"User ({interaction.user.id}) tried to use /code command in wrong channel")
         await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
         return
 
@@ -154,7 +152,7 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     logger.info(f"User ({user.id}) used /code command with code: {code}")
 
     if email_tracker.get(user.id) is None:
-        logger.warning(f"User ({user.id}) tried to use /code command WITHOUT using /verify command first")
+        logger.warning(f"User ({user.id}) used /code command WITHOUT using /verify command first")
         await interaction.response.send_message("Please use **`/verify`** command first to get the code", ephemeral=True, delete_after=5)
         return
     email = email_tracker[user.id][0]
@@ -202,7 +200,7 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     await user.add_roles(grp_role)
 
     if details["GL"]=="YES":
-        await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["GL"]]))
+        await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["grp_no"]]))
 
     logger.info(f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
     await interaction.followup.send(
@@ -232,12 +230,11 @@ async def reset_slash_cmd(interaction: Interaction):
         return
 
     if interaction.channel_id != IDs.verify_channel:
-        logger.warning(f"User ({interaction.user.id}) tried to use /reset command in wrong channel")
         await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
         return
 
     if None in (verification_msg, email_tracker.get(interaction.user.id)):
-        logger.warning(f"User ({interaction.user.id}) tried to use /reset command WITHOUT using /verify command first")
+        logger.warning(f"User ({interaction.user.id}) used /reset command WITHOUT using /verify command first")
         await interaction.response.send_message("You have not provided email yet.\nPlease use **`/verify`** command first.", ephemeral=True, delete_after=5)
         return
     
