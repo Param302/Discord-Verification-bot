@@ -76,6 +76,7 @@ ACC_PSWD=<your google acc app password to send emails>
 > Google account passkey can be obtained from [Google Account App passwords](https://myaccount.google.com/apppasswords).
 
 - Create `ids.json` file which contains the ids of the roles and channels used in the bot.
+- Create `data.csv` file which contains the data of respective house users.
 > **Note**: You need to change the variables in [`bot.py`](./bot.py) file accordingly.
 > All the ids can be obtained from `IDs` class.
 - Run the bot using `python3 main.py`
@@ -86,11 +87,13 @@ ACC_PSWD=<your google acc app password to send emails>
 .
 ├── .gitignore
 ├── .env
+├── ids.json
+|-- data.csv
 ├── README.md
 ├── main.py
 ├── bot.py
 ├── utils.py
-├── discord-bot.log
+├── discord-bot.log // log file [created automatically]
 └── requirements.txt
 ```
 
