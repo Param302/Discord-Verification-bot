@@ -1,8 +1,7 @@
 import asyncio
 import logging
-from typing import Any
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
-from discord import Intents, Client, Message, app_commands, Interaction, Object, Activity, ActivityType
+from discord import Intents, Client, Message, utils, app_commands, Interaction, Object, Activity, ActivityType
 
 __all__ = ["mybot"]
 
@@ -51,7 +50,7 @@ class Bot(Client, IDs):
 
     async def on_message(self, message: Message):
         global email_tracker
-        if message.author == self.user:
+        if message.author == self.user or message.channel.id not in (self.test_channel, self.verify_channel):
             return
 
         logger.info(f"Message received - chnanel: {message.channel.name} by: {message.author}({message.author.id})\tMessage ({message.id}): '{message.content}'")
@@ -158,7 +157,7 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         logger.warning(f"User ({user.id}) tried to use /code command WITHOUT using /verify command first")
         await interaction.response.send_message("Please use **`/verify`** command first to get the code", ephemeral=True, delete_after=5)
         return
-    
+    email = email_tracker[user.id][0]
     await verification_msg.delete(delay=3)
 
     await interaction.response.send_message("## Verifying the code!", ephemeral=True)
@@ -175,25 +174,45 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     
     await interaction.edit_original_response(content="### Code is Valid!\n## You are Verified!")
 
-    if not (details:=check_presence(email_tracker[user.id][0])):
+    await mybot.send_message(mybot.log_channel, f"**{user.name}** is verified. ✅")
 
-        logger.warning(f"User ({user.id}) verified with email: '{email_tracker[user.id][0]}' but is not from Pichavaram House")
+    not_verified_role = utils.get(user.guild.roles, id=IDs.not_verified_role)
+    iitm_role = utils.get(user.guild.roles, id=IDs.verified_iitm_role)
+    branch_role = utils.get(user.guild.roles,
+                            id=IDs.ds_role if "ds" in email.lower() else IDs.es_role
+                            )
+    await user.add_roles(iitm_role)
+    await user.add_roles(branch_role)
+    if not (details:=check_presence(email)):
+
+        logger.warning(f"User ({user.id}) verified with email: '{email}' but is not from Pichavaram House")
         await interaction.followup.send(
             content=f"""# Welcome _{user.display_name}_ to our server. 
             Hope you will enjoy here. 😊""",
             ephemeral=True
             )
+        await user.remove_roles(not_verified_role)
         return
-    
-    logger.info(f"User ({user.id}) verified with email: '{email_tracker[user.id][0]}' and is from Pichavaram House")
+
+    pichavaram_role = utils.get(user.guild.roles, id=IDs.pichavaram_role)
+    grp_role = utils.get(user.guild.roles, id=IDs.group_no[details["grp_no"]])
+
+
+    await user.add_roles(pichavaram_role)
+    await user.add_roles(grp_role)
+
+    if details["GL"]=="YES":
+        await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["GL"]]))
+
+    logger.info(f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
     await interaction.followup.send(
         content=f"""# Welcome _{user.display_name}_ to our server. 😀
-        You are **{details["dept"].upper()}** student of **`20{email_tracker[user.id][0][:2]}`** year.
+        You are **{details["dept"].upper()}** student of **`20{email[:2]}`** year.
         You belongs to Group **`{details["grp_no"]}`**.\n_You will get access to exclusive channels_ :wink: :handshake:\n### As you are one of the Pichavites. 🌟""",
         ephemeral=True
         )
     
-    await mybot.send_message(mybot.log_channel, f"**{user.name}** is verified. ✅")
+    await user.remove_roles(not_verified_role)
     await asyncio.sleep(3)
     await interaction.delete_original_response()
     del email_tracker[interaction.user.id]

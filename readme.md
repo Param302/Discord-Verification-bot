@@ -11,10 +11,11 @@
 [x] Verify OTP
 [x] Synchronize multi-user at a time
 [x] Status added
-[] Log data in a channel and in a file
+[x] Log data in a channel and in a file
 - [x] Details when joined with user id and email id in a file.
 - [x] Log details in a channel
-- [ ] Above details with username, role assigned in channel
+- [x] Above details with username, role assigned in channel
 [ ] Add Embedded msgs rather than text messages
-[ ] Change Roles
+[x] Change Roles
 [ ] Host the bot
+[ ] Let one person joins via one mail id
