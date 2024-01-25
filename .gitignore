@@ -5,6 +5,7 @@ env/
 *.jpg
 *.json
 sample.py
+verification steps embed.txt
 __pycache__/
 *.pyc
 *.pyo

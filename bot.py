@@ -10,7 +10,7 @@ server = None
 mybot = None
 verification_msg = None
 parse_email = EmailParser()
-check_presence = CheckPresence("./sep-23.csv")
+check_presence = CheckPresence("./data.csv")
 email_code_gen = EmailVerifier()
 # user_id : [email_id, gen_code]   -- deleted after verified
 email_tracker = {}
@@ -158,12 +158,11 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     logger.info(f"User ({user.id}) used /code command with code: {code}")
 
     if email_tracker.get(user.id) is None:
-        logger.warning(
-            f"User ({user.id}) used /code command WITHOUT using /verify command first")
         await interaction.response.send_message("Please use **`/verify`** command first to get the code", ephemeral=True, delete_after=5)
         return
     email = email_tracker[user.id][0]
-    await verification_msg.delete(delay=3)
+    if verification_msg:
+        await verification_msg.delete(delay=3)
 
     await interaction.response.send_message("## Verifying the code!", ephemeral=True)
 
@@ -171,14 +170,12 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         logger.warning(
             f"User ({user.id}) entered invalid code: {code}\nCorrect code: {email_tracker[user.id][1]}")
 
-        await interaction.edit_original_response(content=f"""### Invalid code!\nPlease enter the correct 6-digit code."""
-                                                 )
+        await interaction.edit_original_response(content=f"""### Invalid code!\nPlease enter the correct code.""")
         await asyncio.sleep(5)
         await interaction.delete_original_response()
         return
 
-    await interaction.edit_original_response(content="### Code is Valid!\n## You are Verified!")
-
+    await interaction.edit_original_response(content="### Code is Valid!")
     await mybot.send_message(mybot.log_channel, f"**{user.name}** is verified. ✅")
 
     not_verified_role = utils.get(user.guild.roles, id=IDs.not_verified_role)
@@ -186,37 +183,38 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     branch_role = utils.get(user.guild.roles,
                             id=IDs.ds_role if "ds" in email.lower() else IDs.es_role
                             )
+    pichavaram_role = utils.get(user.guild.roles, id=IDs.pichavaram_role)
+
+    house_msg = ""
+    house_roles = ""
+    if not (details := check_presence(email)):
+        logger.info(
+            f"User ({user.id}) verified with email: '{email}' but is not from Pichavaram House")
+    else:
+        logger.info(
+            f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
+        house_msg = "\n\n_You will get access to exclusive channels_ 😉 🤝\n_As you are one of the **Pichavites** 🌟_"
+        gl_role = f'- <@&{IDs.gl_role}>\n- <@&{IDs.GL[details["grp_no"]]}>' if details['GL'] == 'YES' else ''
+        house_roles = f"\n- <@&{IDs.pichavaram_role}>\n- <@&{IDs.group_no[details['grp_no']]}>\n{gl_role}"
+
+    embed = Embed(title="Verification Completed!",
+                  description=f"# Welcome _{user.mention}_ to our server.\n\nYou are a student of **`20{email[:2]}`** year.{house_msg}\n\n### Roles Assigned:\n- <@&{IDs.verified_iitm_role}>\n- <@&{IDs.ds_role if 'ds' in email.lower() else IDs.es_role}>{house_roles}\n\n### Let us know about yourself by giving a sweet intro in <#{IDs.intro_channel}>\n\n_Hope you will enjoy your stay here!_ 😁",
+                  colour=0x2ec27e)
+    embed.set_footer(text="Created by Parampreet Singh",
+                     icon_url="https://avatars.githubusercontent.com/u/76559816?v=4")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
     await user.add_roles(iitm_role)
     await user.add_roles(branch_role)
-    if not (details := check_presence(email)):
-
-        logger.warning(
-            f"User ({user.id}) verified with email: '{email}' but is not from Pichavaram House")
-        await interaction.followup.send(
-            content=f"""# Welcome _{user.display_name}_ to our server. 
-            Hope you will enjoy here. 😊""",
-            ephemeral=True
-        )
-        await user.remove_roles(not_verified_role)
-        return
-
-    pichavaram_role = utils.get(user.guild.roles, id=IDs.pichavaram_role)
-    grp_role = utils.get(user.guild.roles, id=IDs.group_no[details["grp_no"]])
-
-    await user.add_roles(pichavaram_role)
-    await user.add_roles(grp_role)
-
-    if details["GL"] == "YES":
-        await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["grp_no"]]))
-
-    logger.info(
-        f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
-    await interaction.followup.send(
-        content=f"""# Welcome _{user.display_name}_ to our server. 😀
-        You are **{details["dept"].upper()}** student of **`20{email[:2]}`** year.
-        You belongs to Group **`{details["grp_no"]}`**.\n_You will get access to exclusive channels_ :wink: :handshake:\n### As you are one of the Pichavites. 🌟""",
-        ephemeral=True
-    )
+    if not house_msg and not house_roles:
+        await user.add_roles(utils.get(user.guild.roles, id=IDs.other_house_role))
+    else:
+        await user.add_roles(pichavaram_role)
+        await user.add_roles(utils.get(user.guild.roles, id=IDs.group_no[details["grp_no"]]))
+        if details["GL"] == "YES":
+            await user.add_roles(utils.get(user.guild.roles, id=IDs.gl_role))
+            await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["grp_no"]]))
 
     await user.remove_roles(not_verified_role)
     await asyncio.sleep(3)
