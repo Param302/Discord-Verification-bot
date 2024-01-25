@@ -16,7 +16,9 @@ It is used to verify the users who joins the Pichavaram Discord server, by verif
     - [How to contribute?](#how-to-contribute)
 
 ### About Pichavaram House
-Pichavaram House is one of the 12 Official Houses of IIT Madras BS Degree.
+[Pichavaram House](https://sites.google.com/student.onlinedegree.iitm.ac.in/pichavaramhouse/home?authuser=0) is one of the 12 Official Houses of [IIT Madras BS Degree](https://study.iitm.ac.in/ds/).
+
+Being the Web Administrator of Pichavaram House for 2023-24, I have created this bot.
 
 ## How to use
 The bot is mainly used in #verify-here channel of Pichavaram House Discord server only.
@@ -72,18 +74,23 @@ ACC_EMAIL=<your email id to send emails>
 ACC_PSWD=<your google acc app password to send emails>
 ```
 > Discord bot token can be obtained from [Discord Developer Portal](https://discord.com/developers/applications).
+> 
 > Make sure to on the **Privileged Gateway Intents** and provide required permissions to the bot. Also, don't forget to add the bot in server 😂
+> 
 > Google account passkey can be obtained from [Google Account App passwords](https://myaccount.google.com/apppasswords).
 
 - Create `ids.json` file which contains the ids of the roles and channels used in the bot.
 - Create `data.csv` file which contains the data of respective house users.
 > **Note**: You need to change the variables in [`bot.py`](./bot.py) file accordingly.
 > All the ids can be obtained from `IDs` class.
-- Run the bot using `python3 main.py`
+- Run the bot using:
+```bash
+python3 main.py
+```
 - You can keep track of the actions done with bot in [`discord-bot.log`](./discord-bot.log) file.
 
 ### File Structure
-```
+```bash
 .
 ├── .gitignore
 ├── .env

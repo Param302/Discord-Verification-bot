@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
-from discord import Intents, Client, Message, utils, app_commands, Interaction, Object, Activity, ActivityType
+from discord import Intents, Client, Message, Embed, utils, app_commands, Interaction, Object, Activity, ActivityType
 
 __all__ = ["mybot"]
 
@@ -12,13 +12,16 @@ verification_msg = None
 parse_email = EmailParser()
 check_presence = CheckPresence("./sep-23.csv")
 email_code_gen = EmailVerifier()
-email_tracker = {} # user_id : [email_id, gen_code]   -- deleted after verified
+# user_id : [email_id, gen_code]   -- deleted after verified
+email_tracker = {}
 
 # ================ Logger Setup ====================
 logger = logging.getLogger("discord")
 logger.setLevel(logging.CRITICAL)
-log_handler = logging.FileHandler(filename="discord-bot.log", encoding="utf-8", mode="w")
-log_handler.setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s: %(name)s - %(message)s", datefmt="%Y-%d %H:%M:%S"))
+log_handler = logging.FileHandler(
+    filename="discord-bot.log", encoding="utf-8", mode="w")
+log_handler.setFormatter(logging.Formatter(
+    fmt="%(asctime)s - %(levelname)s: %(name)s - %(message)s", datefmt="%Y-%d %H:%M:%S"))
 logger.addHandler(log_handler)
 
 
@@ -38,13 +41,12 @@ class Bot(Client, IDs):
             type=ActivityType.listening,
         ))
         await self.send_startup_message(self.test_channel)
-        # logger.info(f"Startup message sent")
-    
+
     async def send_startup_message(self, channel: int):
         msg = await self.get_channel(channel).send(self.startup_msg)
         self.first_msg_id = msg.id
-    
-    async def send_message(self, channel:int, message:str):
+
+    async def send_message(self, channel: int, message: str):
         await self.get_channel(channel).send(message)
 
     async def on_message(self, message: Message):
@@ -52,7 +54,8 @@ class Bot(Client, IDs):
         if message.author == self.user or message.channel.id not in (self.test_channel, self.verify_channel):
             return
 
-        logger.info(f"Message received - chnanel: {message.channel.name} by: {message.author}({message.author.id})\tMessage ({message.id}): '{message.content}'")
+        logger.info(
+            f"Message received - chnanel: {message.channel.name} by: {message.author}({message.author.id})\tMessage ({message.id}): '{message.content}'")
 
         if message.channel.id == self.test_channel:
             await self.send_message(self.test_channel, f"Hello {message.author.mention}")
@@ -77,15 +80,18 @@ def bot_setup():
     mybot = Bot(intents=intents)
     server = Object(id=IDs.server)
 
+
 bot_setup()
 command_tree = app_commands.CommandTree(mybot)
 
 # ================ Slash Commands ====================
+
+
 @command_tree.command(
-        name="verify", 
-        description="Verify yourself",
-        guild=server,
-    )
+    name="verify",
+    description="Verify yourself",
+    guild=server,
+)
 @app_commands.describe(email="Please enter your IITM Student mail id")
 async def verify_slash_cmd(interaction: Interaction, email: str):
     global mybot, verification_msg, email_tracker
@@ -95,30 +101,31 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
         return
 
     if interaction.channel_id != IDs.verify_channel:
-        logger.warning(f"User ({interaction.user.id}) tried to use /verify command in wrong channel")
+        logger.warning(
+            f"User ({interaction.user.id}) tried to use /verify command in wrong channel")
         await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
         return
 
     if email_tracker.get(interaction.user.id) is not None:
-        logger.warning(f"User ({interaction.user.id}) tried to use /verify command AGAIN with email: '{email}'")
+        logger.warning(
+            f"User ({interaction.user.id}) tried to use /verify command AGAIN with email: '{email}'")
         await interaction.response.send_message("You have already used **`/verify`** command\nIf you think you've entered wrong mail, use **`/reset`** command.", ephemeral=True, delete_after=7)
         return
 
-    logger.info(f"User ({interaction.user.id}) used /verify command with email: '{email}'")
+    logger.info(
+        f"User ({interaction.user.id}) used /verify command with email: '{email}'")
     await interaction.response.send_message("## Validating email id ⏳", ephemeral=True)
     await mybot.send_message(mybot.log_channel, f"**{interaction.user.name}** is verifying.")
 
     if not parse_email(email):
         logger.warning(f"User ({interaction.user.id}) entered invalid email.")
-        await interaction.edit_original_response(content=
-                f"""### Invalid email!\nYou entered: `{
+        await interaction.edit_original_response(content=f"""### Invalid email!\nYou entered: `{
                     email if len(email) < 40 else f"{email[:40]}..."
                 }`\nPlease enter a valid **IITM Student Mail Id** in this format: `<roll_no>@*study.iitm.ac.in`"""
-                )
+                                                 )
         await asyncio.sleep(7)
         await interaction.delete_original_response()
         return
-    
 
     gen_code = email_code_gen(email)
     logger.info(f"Generated code - {gen_code} sent to '{email}'")
@@ -131,10 +138,10 @@ async def verify_slash_cmd(interaction: Interaction, email: str):
 
 
 @command_tree.command(
-        name="code", 
-        description="Enter the code received in your mail",
-        guild=server,
-    )
+    name="code",
+    description="Enter the code received in your mail",
+    guild=server,
+)
 @app_commands.describe(code="Please enter the verification code received in your mail")
 async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     global mybot, verification_msg, email_tracker
@@ -147,12 +154,12 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
         await interaction.response.send_message("### You are not allowed to use this command.", ephemeral=True, delete_after=3)
         return
 
-
     user = interaction.user
     logger.info(f"User ({user.id}) used /code command with code: {code}")
 
     if email_tracker.get(user.id) is None:
-        logger.warning(f"User ({user.id}) used /code command WITHOUT using /verify command first")
+        logger.warning(
+            f"User ({user.id}) used /code command WITHOUT using /verify command first")
         await interaction.response.send_message("Please use **`/verify`** command first to get the code", ephemeral=True, delete_after=5)
         return
     email = email_tracker[user.id][0]
@@ -161,15 +168,15 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
     await interaction.response.send_message("## Verifying the code!", ephemeral=True)
 
     if email_tracker[user.id][1] != code:
-        logger.warning(f"User ({user.id}) entered invalid code: {code}\nCorrect code: {email_tracker[user.id][1]}")
+        logger.warning(
+            f"User ({user.id}) entered invalid code: {code}\nCorrect code: {email_tracker[user.id][1]}")
 
-        await interaction.edit_original_response(content=
-                f"""### Invalid code!\nPlease enter the correct 6-digit code."""
-                )
+        await interaction.edit_original_response(content=f"""### Invalid code!\nPlease enter the correct 6-digit code."""
+                                                 )
         await asyncio.sleep(5)
         await interaction.delete_original_response()
         return
-    
+
     await interaction.edit_original_response(content="### Code is Valid!\n## You are Verified!")
 
     await mybot.send_message(mybot.log_channel, f"**{user.name}** is verified. ✅")
@@ -181,35 +188,36 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
                             )
     await user.add_roles(iitm_role)
     await user.add_roles(branch_role)
-    if not (details:=check_presence(email)):
+    if not (details := check_presence(email)):
 
-        logger.warning(f"User ({user.id}) verified with email: '{email}' but is not from Pichavaram House")
+        logger.warning(
+            f"User ({user.id}) verified with email: '{email}' but is not from Pichavaram House")
         await interaction.followup.send(
             content=f"""# Welcome _{user.display_name}_ to our server. 
             Hope you will enjoy here. 😊""",
             ephemeral=True
-            )
+        )
         await user.remove_roles(not_verified_role)
         return
 
     pichavaram_role = utils.get(user.guild.roles, id=IDs.pichavaram_role)
     grp_role = utils.get(user.guild.roles, id=IDs.group_no[details["grp_no"]])
 
-
     await user.add_roles(pichavaram_role)
     await user.add_roles(grp_role)
 
-    if details["GL"]=="YES":
+    if details["GL"] == "YES":
         await user.add_roles(utils.get(user.guild.roles, id=IDs.GL[details["grp_no"]]))
 
-    logger.info(f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
+    logger.info(
+        f"User ({user.id}) verified with email: '{email}' and is from Pichavaram House")
     await interaction.followup.send(
         content=f"""# Welcome _{user.display_name}_ to our server. 😀
         You are **{details["dept"].upper()}** student of **`20{email[:2]}`** year.
         You belongs to Group **`{details["grp_no"]}`**.\n_You will get access to exclusive channels_ :wink: :handshake:\n### As you are one of the Pichavites. 🌟""",
         ephemeral=True
-        )
-    
+    )
+
     await user.remove_roles(not_verified_role)
     await asyncio.sleep(3)
     await interaction.delete_original_response()
@@ -218,10 +226,10 @@ async def verify_code_slsh_cmd(interaction: Interaction, code: int):
 
 
 @command_tree.command(
-        name="reset", 
-        description="Reset Email Verification",
-        guild=server,
-    )
+    name="reset",
+    description="Reset Email Verification",
+    guild=server,
+)
 async def reset_slash_cmd(interaction: Interaction):
     global verification_msg, email_tracker
 
@@ -234,10 +242,11 @@ async def reset_slash_cmd(interaction: Interaction):
         return
 
     if None in (verification_msg, email_tracker.get(interaction.user.id)):
-        logger.warning(f"User ({interaction.user.id}) used /reset command WITHOUT using /verify command first")
+        logger.warning(
+            f"User ({interaction.user.id}) used /reset command WITHOUT using /verify command first")
         await interaction.response.send_message("You have not provided email yet.\nPlease use **`/verify`** command first.", ephemeral=True, delete_after=5)
         return
-    
+
     await verification_msg.delete(delay=3)
     await interaction.response.send_message("## Resetting your verification!", ephemeral=True)
 
