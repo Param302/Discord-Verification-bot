@@ -126,7 +126,7 @@ A checklist of all the tasks and features to be done.
 - - [x] Details when joined with user id and email id in a file.
 - - [x] Log details in a channel
 - - [x] Above details with username, role assigned in channel
-- [ ] Add Embedded msgs rather than text messages
+- [x] Add Embedded msgs rather than text messages
 - [x] Change Roles
 - [x] Host the bot
 
