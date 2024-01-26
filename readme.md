@@ -1,7 +1,7 @@
 # Discord Verification Bot
 A Discord verification bot made for Pichavaram House's Discord server.
 
-It is used to verify the users who joins the Pichavaram Discord server, by verifying their student email id with the otp, and assign roles based on the email id. It also keep logs of the verification process.
+It is use to verify the users who joins the Pichavaram Discord server, by verifying their student email id with the otp, and assign roles based on the email id. It also keep logs of the verification process.
 
 ## Index
 - [About Pichavaram House](#about-pichavaram-house)
@@ -126,7 +126,7 @@ A checklist of all the tasks and features to be done.
 - - [x] Details when joined with user id and email id in a file.
 - - [x] Log details in a channel
 - - [x] Above details with username, role assigned in channel
-- [ ] Add Embedded msgs rather than text messages
+- [x] Add Embedded msgs rather than text messages
 - [x] Change Roles
 - [x] Host the bot
 
