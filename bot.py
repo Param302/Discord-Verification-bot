@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from sqlite3 import Time
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
-from discord import Intents, Client, Message, Embed, utils, app_commands, Interaction, Object, Activity, ActivityType
+from discord import Intents, Client, Message, Embed, utils, app_commands, Interaction, Object, Activity, ActivityType, channel
 
 __all__ = ["mybot"]
 
@@ -30,7 +31,9 @@ class Bot(Client, IDs):
     def __init__(self, *, intents: Intents):
         super().__init__(intents=intents)
         logger.info("Bot initialized")
-        self.startup_msg = "## Hello, I am a . I am here to help you.\n### <@531398388516651029> created me."
+        # self.startup_msg = "## Hello, I am restarted.\n### <@531398388516651029> created me."
+        self.startup_embed = Embed(title=":wave: Hello, I am restarted.",
+            color=0xfedb00)
 
     async def on_ready(self):
         await self.wait_until_ready()
@@ -40,10 +43,10 @@ class Bot(Client, IDs):
             name="/verify",
             type=ActivityType.listening,
         ))
-        await self.send_startup_message(self.test_channel)
+        await self.send_startup_message(self.log_channel)
 
     async def send_startup_message(self, channel: int):
-        msg = await self.get_channel(channel).send(self.startup_msg)
+        msg = await self.get_channel(channel).send(embed=self.startup_embed)
         self.first_msg_id = msg.id
 
     async def send_message(self, channel: int, message: str):
@@ -51,7 +54,45 @@ class Bot(Client, IDs):
 
     async def on_message(self, message: Message):
         global email_tracker
-        if message.author == self.user or message.channel.id not in (self.test_channel, self.verify_channel):
+
+        if message.author == self.user:
+            return
+        
+        if isinstance(message.channel, channel.DMChannel):
+            if message.author.id == self.param:
+                return
+            param = self.get_user(self.param)
+            dm_embed = Embed(
+                title="Message",
+                description=message.content,
+                colour=0x3DAEFA,
+                timestamp=message.created_at,
+                url=f"https://discordapp.com/users/{message.author.id}"
+            )
+        
+            if message.attachments:
+                print(message.attachments)
+                for idx, attachment in enumerate(message.attachments, start=1):
+                    dm_embed.add_field(name=f"Attachment: {idx}", value=f"[{attachment.filename}]({attachment.url})", inline=False)
+    
+            dm_embed.set_author(name=f"{message.author.display_name} - ({message.author})", icon_url=message.author.avatar.url)
+            dm_embed.set_footer(text=f"User ID: {message.author.id}")
+            await param.send(embed=dm_embed)
+
+            user = self.get_user(message.author.id)
+            reply_embed = Embed(
+                title= "Hello, I am a Verification bot.",
+                description= f"Sorry, I am not programmed to reply to your messages.\nYour message has been sent to my creator - **[{param.display_name}](https://discordapp.com/users/{param.id})**.\nHe will reply to you soon.\nTill then you can check his work and connect with him:",
+                colour=0xfedb00, timestamp= message.created_at
+            )
+            reply_embed.set_author(name=param.display_name, icon_url=param.avatar.url)
+            reply_embed.add_field(name= "Social Profiles", value="_[Github](https://github.com/Param302)\n[LinkedIn](https://linkedin.com/in/param302)\n[Twitter](https://twitter.com/Param3021)_", inline=True)
+            reply_embed.add_field(name= "His work", value= f"_[Bio link](https://param302.bio.link)_", inline=True)
+            reply_embed.set_footer(text= "Thank you for your patience. 😊")
+            await user.send(embed=reply_embed)
+            return
+
+        if message.channel.id not in (self.test_channel, self.verify_channel):
             return
 
         logger.info(
