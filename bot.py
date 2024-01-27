@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from sqlite3 import Time
 from utils import TOKEN, IDs, EmailParser, CheckPresence, EmailVerifier
 from discord import Intents, Client, Message, Embed, utils, app_commands, Interaction, Object, Activity, ActivityType, channel
 
@@ -71,7 +70,6 @@ class Bot(Client, IDs):
             )
         
             if message.attachments:
-                print(message.attachments)
                 for idx, attachment in enumerate(message.attachments, start=1):
                     dm_embed.add_field(name=f"Attachment: {idx}", value=f"[{attachment.filename}]({attachment.url})", inline=False)
     
